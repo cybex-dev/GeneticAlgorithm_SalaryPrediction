@@ -60,15 +60,23 @@ public class Main {
         }
     }
 
+    /**
+     * Mutate current generation genes for genetic diversity
+     */
+    private void mutateOffspringGenes() {
+
+    }
+
+    /**
+     * Check terminating conditions
+     * @return
+     */
     private boolean liveOn() {
         return false;
     }
 
+    // Creates offspring using parent gene crossover
     private void createOffspring() {
-
-    }
-
-    private void crossover() {
 
     }
 
@@ -84,6 +92,12 @@ public class Main {
         }
     }
 
+    /**
+     * Gets the X fittest in population
+     * @param population
+     * @param pos
+     * @return
+     */
     private int[] selectFitessed(int[][] population, int pos) {
         return new int[0];
     }
