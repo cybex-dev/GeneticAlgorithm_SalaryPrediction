@@ -11,105 +11,187 @@ import java.util.Random;
 
 public class Main {
 
+    // Chromosome Values
+    public static int[][] tdData,
+            vdData,
+            edData;
+    // Chromosome Weights
+    public static double[][] population;
+
     // Number of genes in a chromosome
     final int numberOfGenes = 8;
-
     // Size of tournament, used in chromosome selection
     final int tournamentPopSize = 50;
 
     // crossover threshold favouring optimal parent
     final double crossoverThreshold = 0.6;
-
     // Gene mutation rate, small mutation rate
     final double mutationRate = 0.01;
 
-    // persist best solution for each generation
-    final boolean elitism = true;
-
     // Store current generation
     private int generation = 0;
+    // Max generations before stopping
+    private int maxGeneration = 1000;
 
-    // Chromosome Values
-    public static int[][] tdGene, vdGene, edGene;
+    // Container to store accuracy error (used in determining fitness)
+    int trainingMSE = Integer.MAX_VALUE,
+            testMSE = Integer.MAX_VALUE;
 
-    // Chromosome Weights
-    public static double[][] twGene, vwGene, ewGene;
+
+    private Main() {
+        // Evolution Algorithm
+        generatePopulation();
+
+        // Determines SSE
+        evaluateFitness(population, 1);
+
+        // Training set
+        while (liveOn()) {
+            generation++;
+            System.out.print("E #" + generation + " : ");
+
+            // Create new population from current population using crossover technique
+            // Mutate genes of offspring for genetic diversity
+            int[][] offspring = mutate(createOffspring(tdData));
+
+            // replace old generation with new generation
+            System.arraycopy(offspring, 0, tdData, 0, tdData.length);
+
+            // Predict/Determine salaries
+            int[] salaries = evaluateFitness(tdData, tWeight, 1);
+        }
+    }
 
     public static void main(String[] args) {
         new Main();
     }
 
-    private Main(){
-        // Evolution Algorithm
-        generatePopulation();
-
-        evaluateFitness();
-
-        // Training set
-        while (liveOn()) {
-            // Selects new parents from current population using tournament selection.
-            selectParents(tdGene);
-
-            // Create offspring from selected parents. This creates offspring by using crossover genes from each parent.
-            createOffspring();
-
-            // Mutate genes of offspring for genetic diversity
-            mutateOffspringGenes();
-
-            evaluateFitness();
-        }
-    }
-
     /**
      * Mutate current generation genes for genetic diversity
      */
-    private void mutateOffspringGenes() {
+    private int[][] mutate(int[][] offspring) {
+        Random r = new Random(1);
+        for (int i = 0; i < offspring.length; i++) {
+            for (int i1 = 0; i1 < offspring[i].length; i1++) {
+                offspring[i][i1] *= (r.nextGaussian() > 0.5) ? mutationRate : 1-mutationRate;
+            }
+        }
 
+        return offspring;
     }
 
     /**
      * Check terminating conditions
+     *
      * @return
      */
     private boolean liveOn() {
-        return false;
-    }
+        if (generation >= maxGeneration) {
+            System.out.println("Generation timeout reached (" + generation + " iterations)");
+            return false;
+        }
 
-    // Creates offspring using parent gene crossover
-    private void createOffspring() {
+        if ((1-error) >= requiredAccuracy) {
+            System.out.println("Solution found at generation " + generation);
+            return false;
+        }
 
+        return true;
     }
 
     /**
      * Using tournament selection, fitessed parents are selected out of a group of ${tournamentPopSize} and added to ${selected} array
      */
-    private void selectParents(int[][] population) {
-        int[][] selected = new int[population.length][numberOfGenes];
+    private int[][] createOffspring(int[][] population) {
 
-        while (selected.length < population.length) {
-            int[] p1 = selectFitessed(population, 1);
-            int[] p2 = selectFitessed(population, 2);
+        int[][] offSpring = new int[population.length][numberOfGenes];
+
+        // use elitism
+        offSpring[0] = getFittest(population);
+
+        while (offSpring.length < population.length) {
+            int p1 = tournamentSelect(population);
+            int p2 = tournamentSelect(population);
+            crossover(tWeight[p1], tWeight[p2]);
         }
+        return offSpring;
+    }
+
+    // Create offspring from selected parents. This creates offspring by using crossover genes from each parent.
+    private int[] crossover(double[] p1, double[] p2) {
+        Random r = new Random();
+        int[] child = new int[p1.length];
+        for (int i = 0; i < p1.length; i++) {
+            child[i] = (r.nextGaussian() > crossoverThreshold) ? p1[i] : p2[i];
+        }
+        return child;
     }
 
     /**
      * Gets the X fittest in population
+     *
      * @param population
-     * @param pos
      * @return
      */
-    private int[] selectFitessed(int[][] population, int pos) {
-        return new int[0];
+    private int tournamentSelect(int[][] population) {
+        Random r = new Random(1);
+        int[][] selected = new int[tournamentPopSize][numberOfGenes];
+
+        for (int i = 0; i < tournamentPopSize; i++) {
+            Double pos = r.nextGaussian() * population.length;
+            selected[i] = population[pos.intValue()];
+        }
+        return getFittest(selected);
     }
 
-
-    private void evaluateFitness() {
-
-
+    private int[] getFittest(int[][] pop) {
+        for (int i = 0; i < pop.length; i++) {
+            if (getFitness(parent) > getFitness(population[fittestPos]))
+                fittestPos = i;
+        }
     }
 
-    private void evolve() {
-        generation++;
+    private double getFitness(int[] gene, int solution) {
+        double error = gene[0] - solution;
+        return Math.abs(error / gene[0]);
+    }
+
+    private int[] evaluateFitness(int[][] population, int[][] data, final int modelNum) {
+        int[] salaries = new int[population.length];
+
+        for (int j = 0; j < population.length; j++) {
+            Double salary = 0.0;
+
+            for (int i = 0; i < population[j].length; i++) {
+                switch (modelNum) {
+                    case 1: salary += population[j][i] * data[j][i]; break;
+                    case 2: salary += population[j][i] * data[j][i]; break;
+                    case 3:
+                    default: salary += Math.pow(population[j][i] * data[j][i], data[j][i + population.length + 1]); break;
+                }
+            }
+
+            if (modelNum == 2) {
+                salary += data[j][data.length - 1];
+            } else if (modelNum == 3) {
+                salary += data[j][(population.length / 2) + 1];
+            }
+
+            salaries[j] = salary.intValue();
+        }
+
+
+        double localerror = 0.0;
+        for (int i = 0; i < tdGene.length; i++) {
+            localerror += getFitness(data[i], predictedSalaries[i]);
+        }
+
+        // determines error in predicting salary
+        error = localerror / tdGene.length;
+
+
+
+        return salaries;
     }
 
     private void generatePopulation() {
@@ -124,12 +206,12 @@ public class Main {
     }
 
     private void initializeWeights() {
-        twGene = new double[tdGene.length][numberOfGenes];
-        fillWithRandomWeights(twGene);
-        vwGene = new double[vdGene.length][numberOfGenes];
-        fillWithRandomWeights(vwGene);
-        ewGene = new double[edGene.length][numberOfGenes];
-        fillWithRandomWeights(ewGene);
+        tWeight = new double[tdData.length][numberOfGenes];
+        fillWithRandomWeights(tWeight);
+        vWeight = new double[vdData.length][numberOfGenes];
+        fillWithRandomWeights(vWeight);
+        eWeight = new double[edData.length][numberOfGenes];
+        fillWithRandomWeights(eWeight);
     }
 
     private void fillWithRandomWeights(double[][] weightsArray) {
@@ -147,27 +229,27 @@ public class Main {
         int ninetyPercentStart = ints.size() - (ints.size() / 10);
 
         // Read 0% - 89% of SalData
-        tdGene = new int[ninetyPercentStart-1][numberOfGenes];
+        tdData = new int[ninetyPercentStart - 1][numberOfGenes];
         for (int i = 0; i < ninetyPercentStart - 1; i++) {
             int[] ints1 = ints.get(i);
-            System.arraycopy(ints1, 0, tdGene[i], 0, ints1.length);
+            System.arraycopy(ints1, 0, tdData[i], 0, ints1.length);
         }
 
         // Read 90% - 100% of SalData
-        vdGene = new int[ints.size()-ninetyPercentStart][numberOfGenes];
+        vdData = new int[ints.size() - ninetyPercentStart][numberOfGenes];
         for (int i = ninetyPercentStart; i < ints.size(); i++) {
             int[] ints1 = ints.get(i);
-            System.arraycopy(ints1, 0, vdGene[i], 0, ints1.length);
+            System.arraycopy(ints1, 0, vdData[i], 0, ints1.length);
         }
     }
 
     private void readEvaluationData() {
         List<int[]> ints = readCharactersFromFile("/SalData.csv");
-        edGene = new int[ints.size()][numberOfGenes];
+        edData = new int[ints.size()][numberOfGenes];
 
         for (int i = 0; i < ints.size(); i++) {
             int[] ints1 = ints.get(i);
-            System.arraycopy(ints1, 0, vdGene[i], 0, ints1.length);
+            System.arraycopy(ints1, 0, vdData[i], 0, ints1.length);
         }
     }
 
@@ -182,7 +264,7 @@ public class Main {
         try {
             while ((line = br.readLine()) != null) {
                 String[] split = line.split(",");
-               data.add(Arrays.stream(split).mapToInt(Integer::parseInt).toArray());
+                data.add(Arrays.stream(split).mapToInt(Integer::parseInt).toArray());
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -191,10 +273,4 @@ public class Main {
         // Return characters
         return data;
     }
-
-    private void run(){
-
-    }
-
-
 }
