@@ -9,7 +9,7 @@ class GA {
     private final String carat = ",";
 
     // Population solution size
-    private int populationSize = 100;
+    private int populationSize = 10000;
     // Number of genes in a chromosome
     private final int numberOfAttributes = 7;
     // Size of tournament, used in chromosome selection
@@ -77,17 +77,19 @@ class GA {
             popSolutionsFile.delete();
     }
 
-    public GA evolve(int populationSize, int tournamentPopulationSize, double v, double v1, double v2){
+    public GA evolve(){
+        tournamentPopSize = populationSize / 10;
         run();
         return this;
     }
 
-    public GA evolve(int populationSize, int tournamentPopulationSize, int crossoverThreshold, int mutationProb, int mutationMagnitude){
+    public GA evolve(int populationSize, double crossoverThreshold, double mutationProb, double mutationMagnitude){
         this.populationSize = populationSize;
-        this.tournamentPopSize = tournamentPopulationSize;
         this.crossoverThreshold = crossoverThreshold;
         this.mutationProb = mutationProb;
         this.mutationMagnitude = mutationMagnitude;
+
+        tournamentPopSize = populationSize / 10;
 
         run();
 
@@ -100,7 +102,7 @@ class GA {
 
         // Determine training and testing MSE
         // Store determined salaries for each
-        System.out.print("E #" + generation + " : ");
+        //$system.out.print("E #" + generation + " : ");
         evaluatePopulation(population, trainingData, trainingActualSalary, calcTrainSalary, trainingSSE);
         evaluatePopulation(population, testData, testActualSalary, calcTestSalary, testSSE);
 
@@ -108,7 +110,7 @@ class GA {
         while (!terminate()) {
             //Increment generation
             generation++;
-            System.out.print("E #" + generation + " : ");
+            //$system.out.print("E #" + generation + " : ");
 
             // Generate new population using tournament selection and use elitism and mutate based on performance
             double[][] newPop = createOffspring(population);
@@ -118,13 +120,15 @@ class GA {
             evaluatePopulation(population, trainingData, trainingActualSalary, calcTrainSalary, trainingSSE);
             evaluatePopulation(population, testData, testActualSalary, calcTestSalary, testSSE);
         }
+
+        System.out.println("\tSSE:\t\t" + previousTestSSE);
     }
 
     private boolean terminate() {
         writeOffspring();
 
         if (generation >= maxGeneration) {
-            System.out.println("NOTE: Generation timeout reached (" + generation + " iterations)");
+            //$system.out.println("NOTE: Generation timeout reached (" + generation + " iterations)");
             return true;
         }
 
@@ -135,13 +139,13 @@ class GA {
         writeToFile(generation + carat + testSSE[fittestIndex] + "\n");
 
         if (numberOfMatches == testActualSalary.length) {
-            System.out.println("NOTE: Solution found at generation " + generation + "with solution: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
+            //$system.out.println("NOTE: Solution found at generation " + generation + "with solution: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
             return true;
         }
 
         // Check if lowest SSE is reached
         if (testSSE[fittestIndex] > previousTestSSE){
-            System.out.println("NOTE: Lowest Test SSE reached [" + fittestIndex + "]: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
+            //$system.out.println("NOTE: Lowest Test SSE reached [" + fittestIndex + "]: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
             if (stopOnFittestFound)
                 return true;
         } else {
@@ -150,7 +154,7 @@ class GA {
             previousTestSolution = population[fittestIndex];
         }
 
-        System.out.print("\t\t#" + generation + " Matches= " + numberOfMatches + " \t\t\tTestSSE= " + testSSE[fittestIndex] + "\n");
+        //$system.out.print("\t\t#" + generation + " Matches= " + numberOfMatches + " \t\t\tTestSSE= " + testSSE[fittestIndex] + "\n");
 
         return false;
     }
@@ -354,7 +358,7 @@ class GA {
         // use elitism
         int fittestIndex = getFittest(trainingSSE);
 
-        //System.out.println("Fittest Training SSE Index [" + fittestIndex + "] : " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
+        ////$system.out.println("Fittest Training SSE Index [" + fittestIndex + "] : " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
 
         offSpring[++offspringCount] = population[fittestIndex];
 
@@ -365,7 +369,7 @@ class GA {
             int p1Index = tournamentSelect(population);
             int p2Index = tournamentSelect(population);
 
-//            System.out.println("Selecting parents: " + p1Index + " & " + p2Index);
+//            //$system.out.println("Selecting parents: " + p1Index + " & " + p2Index);
 
             // Favour most fit parent
             if (trainingSSE[p1Index] > trainingSSE[p2Index]){
@@ -459,11 +463,11 @@ class GA {
     }
 
     public void predict() {
-        System.out.println("Using solution: " + Arrays.stream(previousTestSolution).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
+        //$system.out.println("Using solution: " + Arrays.stream(previousTestSolution).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
         for (int i = 0; i < validationData.length; i++) {
             double salary = determineSalary(validationData[i], previousTestSolution);
-            System.out.println("#" + i + " Salary = " + salary);
-            System.out.println("Using solution: " + Arrays.stream(validationData[i]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
+            //$system.out.println("Using DataItem: " + Arrays.stream(validationData[i]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
+            //$system.out.println("#" + i + " Salary = " + salary);
         }
     }
 
