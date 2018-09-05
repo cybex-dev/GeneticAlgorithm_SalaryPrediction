@@ -1,30 +1,33 @@
 import java.io.*;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
-import static sun.security.krb5.Confounder.intValue;
-
 class GA {
 
+    private final String carat = ",";
+
     // Population solution size
-    private final int populationSize = 200;
+    private final int populationSize = 1000;
     // Number of genes in a chromosome
     private final int numberOfAttributes = 7;
     // Size of tournament, used in chromosome selection
-    private static final int tournamentPopSize = 50;
+    private static final int tournamentPopSize = 10;
 
     // crossover threshold favouring optimal parent
     private static final double crossoverThreshold = 0.5;
+
+    // Probabilty of mutation
+    private static final double mutationProb = 0.5;
+
     // Gene mutation rate, small mutation rate
-    private static final double mutationMagnitude = 0.01;
+    private static final double mutationMagnitude = 10;
 
     // Store current generation
     private int generation = 0;
     // Max generations before stopping
-    private static final int maxGeneration = 5000;
+    private static final int maxGeneration = 1000;
 
     // Store data for training, testing and validation sets
     // [row number] [# of attributes]
@@ -58,6 +61,12 @@ class GA {
 
 
     GA(){
+        File file = new File("offspring.csv");
+        File file2 = new File("output_model" +  (modelIndex + 1) + ".csv");
+        if (file.exists())
+            file.delete();
+        if (file2.exists())
+            file2.delete();
     }
 
     void run(){
@@ -87,31 +96,25 @@ class GA {
     }
 
     private boolean terminate() {
+        writeOffspring();
+
         if (generation >= maxGeneration) {
             System.out.println("NOTE: Generation timeout reached (" + generation + " iterations)");
             return true;
         }
 
-        // Get fittest in population, and the number of matches the solution has
-        int fittestValueOfSolution = 0;
-
         // Fittest index based on solutions index
         int fittestIndex = getFittest(testSSE);
-        int fitnessRating = getFitness(calcTestSalary[fittestIndex], testActualSalary);
+        int numberOfMatches = salaryMatches(calcTestSalary[fittestIndex], testActualSalary);
 
-        writeToFile(generation + ";" + testSSE[fittestIndex] + "\n");
+        writeToFile(generation + carat + testSSE[fittestIndex] + "\n");
 
-        if (fitnessRating == testActualSalary.length) {
+        if (numberOfMatches == testActualSalary.length) {
             System.out.println("NOTE: Solution found at generation " + generation + "with solution: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
             return true;
-        } else {
-            int fitness = getFitness(calcTestSalary[fittestIndex], testActualSalary);
-
-            if (fittestValueOfSolution < fitness)
-                fittestValueOfSolution = fitness;
         }
 
-        System.out.print("\t\tFittest solution= " + fittestValueOfSolution + " \t\t\tTestSSE= " + testSSE[fittestIndex] + "\n");
+        System.out.print("\t\t# Matches= " + numberOfMatches + " \t\t\tTestSSE= " + testSSE[fittestIndex] + "\n");
 
         return false;
     }
@@ -122,7 +125,7 @@ class GA {
      * @param actualSalaries actual salaries from data
      * @return fitness value
      */
-    private int getFitness(double[] calculatedSalaries, double[] actualSalaries) {
+    private int salaryMatches(double[] calculatedSalaries, double[] actualSalaries) {
         int currentFittest = 0;
         for (int j = 0; j < calculatedSalaries.length; j++) {
             if (calculatedSalaries[j] == actualSalaries[j]){
@@ -150,8 +153,8 @@ class GA {
 
             printWriter.write("#" + generation );
             Arrays.stream(population).forEach(doubles -> {
-                printWriter.write(";");
-                Arrays.stream(doubles).forEach(value -> printWriter.write(value + ";"));
+                printWriter.write(carat);
+                Arrays.stream(doubles).forEach(value -> printWriter.write(value + carat));
             });
             printWriter.write("\n");
 
@@ -168,7 +171,6 @@ class GA {
      */
     private void evaluatePopulation(double[][] population, int[][] dataItems, double[] actualSalaryStore, double[][] calcSalaryStore, double[] sseStore) {
 
-        writeOffspring();
         // for each solution in the population, determine the salary using model # and store this.
         for (int i = 0; i < population.length; i++) {
 
@@ -192,8 +194,7 @@ class GA {
                 localSSE += pow;
             }
 
-            double i1 = localSSE / dataItems.length;
-            sseStore[i] = i1;
+            sseStore[i] = localSSE;
         }
 
     }
@@ -247,18 +248,17 @@ class GA {
     }
 
     private double nextRandom() {
-        Random random = new Random();
-        double v = random.nextInt(5000);
-        while (v < 0){
-            v = random.nextInt(5000);
-        }
-        return v;
+        return new Random().nextDouble();
+    }
+
+    private double nextGaussian(){
+        return new Random().nextGaussian();
     }
 
     private void readTrainAndValidationData() {
         List<int[]> ints = readCharactersFromFile("/SalData.csv");
 
-        int ninetyPercentStart = ints.size() - (ints.size() / 10);
+        int ninetyPercentStart = ints.size() - (ints.size() / 5);
 
         // Read 0% - 89% of SalData
         trainingData = new int[ninetyPercentStart - 1][numberOfAttributes];
@@ -314,14 +314,20 @@ class GA {
 
     private double[][] createOffspring(double[][] population) {
 
-        Random r = new Random();
         int offspringCount = -1;
         double[][] offSpring = new double[population.length][numberOfAttributes];
 
         // use elitism
-        offSpring[++offspringCount] = population[getFittest(trainingSSE)];
+        int fittestIndex = getFittest(trainingSSE);
 
-        while (offspringCount < (population.length-1)) {
+        System.out.println("Fittest Training SSE Index [" + fittestIndex + "] : " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
+
+        offSpring[++offspringCount] = population[fittestIndex];
+
+        int worstPerformers = population.length / 10;
+
+        // Crossovers with mutation
+        while (offspringCount < ((population.length-1) - worstPerformers)) {
             int p1Index = tournamentSelect(population);
             int p2Index = tournamentSelect(population);
 
@@ -334,13 +340,33 @@ class GA {
                 p1Index = temp;
             }
 
-            double[] crossover = crossover(population[p1Index], population[p2Index]);
+            double[] child = mutate(crossover(population[p1Index], population[p2Index]));
 
-            crossover[r.nextInt(crossover.length - 1)] *= (r.nextInt(10) > 4) ? mutationMagnitude : (1 - mutationMagnitude);
-
-            offSpring[++offspringCount] = crossover;
+            offSpring[++offspringCount] = child;
         }
+
+        // Add worst performers
+        for (int i = 0; i < worstPerformers; i++) {
+            offSpring[++offspringCount] = population[nextRandomIndex(population.length)];
+        }
+
         return offSpring;
+    }
+
+    private double[] mutate(double[] crossover) {
+        // Check if should mutate
+        if (nextRandom() <= mutationProb) {
+            // Mutate child with new random values
+            double mutationValue = nextGaussian() * mutationMagnitude;
+
+            for (int i = 0; i < crossover.length; i++) {
+                if (nextRandom() <= mutationProb) {
+                    crossover[i] += mutationValue;
+                }
+            }
+        }
+
+        return crossover;
     }
 
 
@@ -351,7 +377,7 @@ class GA {
      */
     private int getFittest(double[] population) {
         int fittest = 0;
-        for (int i = 1; i < population.length; i++) {
+        for (int i = 0; i < population.length; i++) {
             if (population[fittest] > population[i])
                 fittest = i;
         }
@@ -366,12 +392,16 @@ class GA {
         return child;
     }
 
+    /**
+     * Select ${tournamentPopSize} number of random individuals from current population
+     * @param population
+     * @return
+     */
     private int tournamentSelect(double[][] population) {
-        Random r = new Random();
         int[] selected = new int[tournamentPopSize];
 
         for (int i = 0; i < tournamentPopSize; i++) {
-            selected[i] = r.nextInt(population.length);
+            selected[i] = nextRandomIndex(population.length);
         }
 
         int fittestIndexInSelected = 0;
@@ -388,6 +418,10 @@ class GA {
 
         int i = selected[fittestIndexInSelected];
         return i;
+    }
+
+    private int nextRandomIndex(int tournamentPopSize) {
+        return new Random().nextInt(tournamentPopSize);
     }
 
 }
