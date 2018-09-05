@@ -4,8 +4,10 @@ public class Main {
 
     private Main() {
 
-        GA ga = new GA();
-        ga.evolve();
+        new GA()
+                .evolve(100, 10, 0.5, 0.33, 0.5)
+                .earlyStop(false)
+                .predict();
     }
 
     public static void main(String[] args) {

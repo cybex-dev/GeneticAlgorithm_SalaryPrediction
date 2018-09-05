@@ -47,6 +47,8 @@ class GA {
     private double previousTestSSE = Double.MAX_VALUE;
     private double[] previousTestSolution = new double[numberOfAttributes];
 
+    private File offspringFile, popSolutionsFile;
+
     /**
      * Model Index:
      * 0. Simple Linear
@@ -62,22 +64,25 @@ class GA {
     // Solutions generated which are evolved. [number of solutions][c values for each solution]
     private double[][] population = null;
 
+    // Stops processing after fittest solution is found
+    private boolean stopOnFittestFound;
 
 
     GA(){
-        File file = new File("output/offspring_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
-        File file2 = new File("output/pop_solutions_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
-        if (file.exists())
-            file.delete();
-        if (file2.exists())
-            file2.delete();
+        offspringFile = new File("output/offspring_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
+        popSolutionsFile = new File("output/pop_solutions_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
+        if (offspringFile.exists())
+            popSolutionsFile.delete();
+        if (offspringFile.exists())
+            popSolutionsFile.delete();
     }
 
-    public void evolve(){
+    public GA evolve(int populationSize, int tournamentPopulationSize, double v, double v1, double v2){
         run();
-    };
+        return this;
+    }
 
-    public void evolve(int populationSize, int tournamentPopulationSize, int crossoverThreshold, int mutationProb, int mutationMagnitude){
+    public GA evolve(int populationSize, int tournamentPopulationSize, int crossoverThreshold, int mutationProb, int mutationMagnitude){
         this.populationSize = populationSize;
         this.tournamentPopSize = tournamentPopulationSize;
         this.crossoverThreshold = crossoverThreshold;
@@ -85,7 +90,9 @@ class GA {
         this.mutationMagnitude = mutationMagnitude;
 
         run();
-    };
+
+        return this;
+    }
 
     private void run(){
         // Generate initial population
@@ -135,7 +142,8 @@ class GA {
         // Check if lowest SSE is reached
         if (testSSE[fittestIndex] > previousTestSSE){
             System.out.println("NOTE: Lowest Test SSE reached [" + fittestIndex + "]: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
-            return true;
+            if (stopOnFittestFound)
+                return true;
         } else {
             // Save current fittest solution
             previousTestSSE = testSSE[fittestIndex];
@@ -165,7 +173,7 @@ class GA {
 
     private void writeToFile(String s) {
         try {
-            FileWriter writer = new FileWriter("output_model" + (modelIndex + 1)+ ".csv", true);
+            FileWriter writer = new FileWriter(popSolutionsFile, true);
             PrintWriter printWriter = new PrintWriter(writer, true);
             printWriter.write(s);
             printWriter.close();
@@ -176,7 +184,7 @@ class GA {
 
     private void writeOffspring() {
         try {
-            FileWriter writer = new FileWriter("offspring.csv", true);
+            FileWriter writer = new FileWriter(offspringFile, true);
             PrintWriter printWriter = new PrintWriter(writer, true);
 
             printWriter.write("#" + generation );
@@ -457,5 +465,10 @@ class GA {
             System.out.println("#" + i + " Salary = " + salary);
             System.out.println("Using solution: " + Arrays.stream(validationData[i]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
         }
+    }
+
+    public GA earlyStop(boolean b) {
+        stopOnFittestFound = b;
+        return this;
     }
 }
