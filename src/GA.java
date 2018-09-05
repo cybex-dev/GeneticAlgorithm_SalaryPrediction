@@ -79,6 +79,9 @@ class GA {
 
     public GA evolve(){
         tournamentPopSize = populationSize / 10;
+
+        System.out.println("Starting: \tPopSize=" + populationSize + " \tTour=" + tournamentPopSize + " \tX=" + crossoverThreshold + " \tMProb=" + mutationProb + " \tMMag=" + mutationMagnitude);
+
         run();
         return this;
     }
@@ -88,12 +91,7 @@ class GA {
         this.crossoverThreshold = crossoverThreshold;
         this.mutationProb = mutationProb;
         this.mutationMagnitude = mutationMagnitude;
-
-        tournamentPopSize = populationSize / 10;
-
-        run();
-
-        return this;
+        return evolve();
     }
 
     private void run(){

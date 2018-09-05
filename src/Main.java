@@ -1,5 +1,7 @@
 // http://www.theprojectspot.com/tutorial-post/creating-a-genetic-algorithm-for-beginners/3
 
+import java.io.File;
+
 public class Main {
 
     private Main() {
@@ -35,6 +37,8 @@ public class Main {
     }
 
     public static void main(String[] args) {
+        new File("output").mkdirs();
+
         new Main();
     }
 }
