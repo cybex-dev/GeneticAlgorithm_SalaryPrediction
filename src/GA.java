@@ -1,4 +1,5 @@
 import java.io.*;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -9,22 +10,21 @@ import static sun.security.krb5.Confounder.intValue;
 class GA {
 
     // Population solution size
-    private final int populationSize = 100;
+    private final int populationSize = 200;
     // Number of genes in a chromosome
     private final int numberOfAttributes = 7;
     // Size of tournament, used in chromosome selection
-    private static final int tournamentPopSize = 20;
+    private static final int tournamentPopSize = 50;
 
     // crossover threshold favouring optimal parent
     private static final double crossoverThreshold = 0.5;
     // Gene mutation rate, small mutation rate
-    private static final double mutationRate = 0.1;
-    private static final double mutationMagnitude = 0.05;
+    private static final double mutationMagnitude = 0.01;
 
     // Store current generation
     private int generation = 0;
     // Max generations before stopping
-    private static final int maxGeneration = 10000;
+    private static final int maxGeneration = 5000;
 
     // Store data for training, testing and validation sets
     // [row number] [# of attributes]
@@ -99,7 +99,7 @@ class GA {
         int fittestIndex = getFittest(testSSE);
         int fitnessRating = getFitness(calcTestSalary[fittestIndex], testActualSalary);
 
-        writeToFile(generation, testSSE[fittestIndex]);
+        writeToFile(generation + ";" + testSSE[fittestIndex] + "\n");
 
         if (fitnessRating == testActualSalary.length) {
             System.out.println("NOTE: Solution found at generation " + generation + "with solution: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
@@ -109,10 +109,9 @@ class GA {
 
             if (fittestValueOfSolution < fitness)
                 fittestValueOfSolution = fitness;
-            writeToFile(generation, fitness);
         }
 
-        System.out.print("\t\tFittest solution= " + fittestValueOfSolution + "\n");
+        System.out.print("\t\tFittest solution= " + fittestValueOfSolution + " \t\t\tTestSSE= " + testSSE[fittestIndex] + "\n");
 
         return false;
     }
@@ -133,11 +132,29 @@ class GA {
         return currentFittest;
     }
 
-    private void writeToFile(int generation, double currentFittest) {
+    private void writeToFile(String s) {
         try {
             FileWriter writer = new FileWriter("output_model" + (modelIndex + 1)+ ".csv", true);
             PrintWriter printWriter = new PrintWriter(writer, true);
-            printWriter.write(generation + ";" + currentFittest + "\n");
+            printWriter.write(s);
+            printWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void writeOffspring() {
+        try {
+            FileWriter writer = new FileWriter("offspring.csv", true);
+            PrintWriter printWriter = new PrintWriter(writer, true);
+
+            printWriter.write("#" + generation );
+            Arrays.stream(population).forEach(doubles -> {
+                printWriter.write(";");
+                Arrays.stream(doubles).forEach(value -> printWriter.write(value + ";"));
+            });
+            printWriter.write("\n");
+
             printWriter.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -150,6 +167,8 @@ class GA {
      *  Also, the MSE is calculates for each salary
      */
     private void evaluatePopulation(double[][] population, int[][] dataItems, double[] actualSalaryStore, double[][] calcSalaryStore, double[] sseStore) {
+
+        writeOffspring();
         // for each solution in the population, determine the salary using model # and store this.
         for (int i = 0; i < population.length; i++) {
 
@@ -293,13 +312,9 @@ class GA {
         return data;
     }
 
-
-
-
-
-
     private double[][] createOffspring(double[][] population) {
 
+        Random r = new Random();
         int offspringCount = -1;
         double[][] offSpring = new double[population.length][numberOfAttributes];
 
@@ -310,6 +325,8 @@ class GA {
             int p1Index = tournamentSelect(population);
             int p2Index = tournamentSelect(population);
 
+//            System.out.println("Selecting parents: " + p1Index + " & " + p2Index);
+
             // Favour most fit parent
             if (trainingSSE[p1Index] > trainingSSE[p2Index]){
                 int temp = p1Index;
@@ -319,11 +336,7 @@ class GA {
 
             double[] crossover = crossover(population[p1Index], population[p2Index]);
 
-            for (int i = 0; i < crossover.length; i++) {
-                if (nextRandom() > mutationRate) {
-                    crossover[i] *= (1 - mutationMagnitude);
-                }
-            }
+            crossover[r.nextInt(crossover.length - 1)] *= (r.nextInt(10) > 4) ? mutationMagnitude : (1 - mutationMagnitude);
 
             offSpring[++offspringCount] = crossover;
         }
@@ -351,12 +364,6 @@ class GA {
             child[i] = (nextRandom() > crossoverThreshold) ? p1[i] : p2[i];
         }
         return child;
-    }
-
-    private double[] mutate(double[] offspring) {
-        Random r = new Random(1);
-
-        return offspring;
     }
 
     private int tournamentSelect(double[][] population) {
