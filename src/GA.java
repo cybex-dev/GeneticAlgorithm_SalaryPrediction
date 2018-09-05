@@ -9,20 +9,20 @@ class GA {
     private final String carat = ",";
 
     // Population solution size
-    private final int populationSize = 1000;
+    private int populationSize = 100;
     // Number of genes in a chromosome
     private final int numberOfAttributes = 7;
     // Size of tournament, used in chromosome selection
-    private static final int tournamentPopSize = 10;
+    private int tournamentPopSize = 10;
 
     // crossover threshold favouring optimal parent
-    private static final double crossoverThreshold = 0.5;
+    private double crossoverThreshold = 0.5;
 
     // Probabilty of mutation
-    private static final double mutationProb = 0.5;
+    private double mutationProb = 0.5;
 
     // Gene mutation rate, small mutation rate
-    private static final double mutationMagnitude = 10;
+    private double mutationMagnitude = 10;
 
     // Store current generation
     private int generation = 0;
@@ -41,15 +41,19 @@ class GA {
 
     // Container for holding solutions, [solution index][data item index]
     private double[][] calcTrainSalary = null,
-            calcTestSalary = null,
-            calcValidationSalary = null;
+            calcTestSalary = null;
+
+    // Previous fittest test SSE
+    private double previousTestSSE = Double.MAX_VALUE;
+    private double[] previousTestSolution = new double[numberOfAttributes];
+
     /**
      * Model Index:
      * 0. Simple Linear
      * 1. Linear with constant
      * 2. Exponential with constant
      */
-    private int modelIndex = 0;
+    private int modelIndex = 1;
 
     // Container to store training and testing SSE
     private double[] trainingSSE = new double[populationSize],
@@ -61,15 +65,29 @@ class GA {
 
 
     GA(){
-        File file = new File("offspring.csv");
-        File file2 = new File("output_model" +  (modelIndex + 1) + ".csv");
+        File file = new File("output/offspring_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
+        File file2 = new File("output/pop_solutions_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
         if (file.exists())
             file.delete();
         if (file2.exists())
             file2.delete();
     }
 
-    void run(){
+    public void evolve(){
+        run();
+    };
+
+    public void evolve(int populationSize, int tournamentPopulationSize, int crossoverThreshold, int mutationProb, int mutationMagnitude){
+        this.populationSize = populationSize;
+        this.tournamentPopSize = tournamentPopulationSize;
+        this.crossoverThreshold = crossoverThreshold;
+        this.mutationProb = mutationProb;
+        this.mutationMagnitude = mutationMagnitude;
+
+        run();
+    };
+
+    private void run(){
         // Generate initial population
         generatePopulation();
 
@@ -114,7 +132,17 @@ class GA {
             return true;
         }
 
-        System.out.print("\t\t# Matches= " + numberOfMatches + " \t\t\tTestSSE= " + testSSE[fittestIndex] + "\n");
+        // Check if lowest SSE is reached
+        if (testSSE[fittestIndex] > previousTestSSE){
+            System.out.println("NOTE: Lowest Test SSE reached [" + fittestIndex + "]: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
+            return true;
+        } else {
+            // Save current fittest solution
+            previousTestSSE = testSSE[fittestIndex];
+            previousTestSolution = population[fittestIndex];
+        }
+
+        System.out.print("\t\t#" + generation + " Matches= " + numberOfMatches + " \t\t\tTestSSE= " + testSSE[fittestIndex] + "\n");
 
         return false;
     }
@@ -240,11 +268,10 @@ class GA {
         readTrainAndValidationData();
 
         // read Validation Data
-//        readEvaluationData();
+        readEvaluationData();
 
         calcTrainSalary = new double[population.length][trainingData.length];
         calcTestSalary = new double[population.length][testData.length];
-//        calcValidationSalary = new double[population.length][validationData.length];
     }
 
     private double nextRandom() {
@@ -286,8 +313,7 @@ class GA {
 
         for (int i = 0; i < ints.size(); i++) {
             int[] ints1 = ints.get(i);
-            System.arraycopy(ints1, 0, validationData[i], 0, ints1.length);
-
+            System.arraycopy(ints1, 0, validationData[i], 0, ints1.length-1);
         }
     }
 
@@ -320,7 +346,7 @@ class GA {
         // use elitism
         int fittestIndex = getFittest(trainingSSE);
 
-        System.out.println("Fittest Training SSE Index [" + fittestIndex + "] : " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
+        //System.out.println("Fittest Training SSE Index [" + fittestIndex + "] : " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
 
         offSpring[++offspringCount] = population[fittestIndex];
 
@@ -424,4 +450,12 @@ class GA {
         return new Random().nextInt(tournamentPopSize);
     }
 
+    public void predict() {
+        System.out.println("Using solution: " + Arrays.stream(previousTestSolution).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
+        for (int i = 0; i < validationData.length; i++) {
+            double salary = determineSalary(validationData[i], previousTestSolution);
+            System.out.println("#" + i + " Salary = " + salary);
+            System.out.println("Using solution: " + Arrays.stream(validationData[i]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
+        }
+    }
 }
