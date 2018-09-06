@@ -6,8 +6,8 @@ public class Main {
 
     private Main() {
 
-//        test();
-        stats();
+        test();
+//        stats();
     }
 
     private void test() {
@@ -18,18 +18,20 @@ public class Main {
     }
 
     private void stats() {
-        for (int popSize: new int[]{100, 1000, 10000}) {
-            System.out.println("Population: " + popSize);
-            for (double xOver: new double[]{0.5, 0.6, 0.8}) {
-                System.out.println("- Crossover Rate: " + xOver);
-                for (double prob: new double[]{0.33, 0.2, 0.5}){
-                    System.out.println("-- Mutation Probability: " + prob);
-                    for (double rate: new double[]{0.5, 1, 2, 5, 10}){
-                        System.out.println("--- Mutation Magnitude: " + rate);
-                        new GA()
-                                .evolve(popSize, xOver, prob, rate)
-                                .earlyStop(false)
-                                .predict();
+        for (int model: new int[]{0, 1, 2}){
+            for (int popSize: new int[]{50, 100, 500, 1000}) {
+                System.out.println("Population: " + popSize);
+                for (double xOver: new double[]{0.5, 0.6, 0.8}) {
+                    System.out.println("- Crossover Rate: " + xOver);
+                    for (double prob: new double[]{0.33, 0.2, 0.5}){
+                        System.out.println("-- Mutation Probability: " + prob);
+                        for (double rate: new double[]{0.5, 1, 5, 10}){
+                            System.out.println("--- Mutation Magnitude: " + rate);
+                            new GA()
+                                    .evolve(model, popSize, xOver, prob, rate)
+                                    .earlyStop(false)
+                                    .predict();
+                        }
                     }
                 }
             }

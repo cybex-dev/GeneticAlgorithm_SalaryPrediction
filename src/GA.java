@@ -9,7 +9,7 @@ class GA {
     private final String carat = ",";
 
     // Population solution size
-    private int populationSize = 10000;
+    private int populationSize = 1000;
     // Number of genes in a chromosome
     private final int numberOfAttributes = 7;
     // Size of tournament, used in chromosome selection
@@ -55,7 +55,7 @@ class GA {
      * 1. Linear with constant
      * 2. Exponential with constant
      */
-    private int modelIndex = 1;
+    private int modelIndex = 2;
 
     // Container to store training and testing SSE
     private double[] trainingSSE = new double[populationSize],
@@ -86,7 +86,8 @@ class GA {
         return this;
     }
 
-    public GA evolve(int populationSize, double crossoverThreshold, double mutationProb, double mutationMagnitude){
+    public GA evolve(int modelIndex, int populationSize, double crossoverThreshold, double mutationProb, double mutationMagnitude){
+        this.modelIndex = modelIndex;
         this.populationSize = populationSize;
         this.crossoverThreshold = crossoverThreshold;
         this.mutationProb = mutationProb;
@@ -108,7 +109,7 @@ class GA {
         while (!terminate()) {
             //Increment generation
             generation++;
-            //$system.out.print("E #" + generation + " : ");
+            System.out.println("#" + generation);
 
             // Generate new population using tournament selection and use elitism and mutate based on performance
             double[][] newPop = createOffspring(population);
@@ -263,8 +264,19 @@ class GA {
     }
 
     private void generatePopulation() {
+       trainingSSE = new double[populationSize];
+       testSSE = new double[populationSize];
+
+        int numWeights = 0;
+
+        switch (modelIndex) {
+            case 2: numWeights = numberOfAttributes;
+            case 1: numWeights += 1;
+            case 0: numWeights += numberOfAttributes; break;
+        }
+
         // Initialize first generation solutions
-        population = new double[populationSize][numberOfAttributes];
+        population = new double[populationSize][numWeights];
         for (int i = 0; i < populationSize; i++) {
             for (int i1 = 0; i1 < population[i].length; i1++) {
                 population[i][i1] = nextRandom();
