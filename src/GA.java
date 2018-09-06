@@ -243,15 +243,14 @@ class GA {
 
         // determine salary of a specific data item
         for (int j = 0; j < numberOfAttributes; j++) {
-            switch (modelIndex) {
-                case 0:
-                case 1:
-                    salary += dataItem[j] * solution[j];
-                    break;
-                case 2:
-                default:
-                    salary += Math.pow(dataItem[j] * solution[j], solution[j + numberOfAttributes + 1]);
-                    break;
+            if (modelIndex == 0) {
+                salary += dataItem[j] * solution[j];
+            } else if (modelIndex == 1) {
+                salary += dataItem[j] * solution[j];
+            } else {
+                double s = dataItem[j] * solution[j];
+                s *= s;
+                salary += s;
             }
 
             // Add 'C8' parameter
