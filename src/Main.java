@@ -1,17 +1,50 @@
 // http://www.theprojectspot.com/tutorial-post/creating-a-genetic-algorithm-for-beginners/3
 
-import java.io.File;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Main {
 
+    List<int[]> trainData, validationData;
+
     private Main() {
 
-        test();
-//        stats();
+
+        trainData = readCharactersFromFile("/SalData.csv");
+        validationData = readCharactersFromFile("/Evaluation.csv");
+
+//        test();
+        stats();
+    }
+
+
+    private List<int[]> readCharactersFromFile(String resource) {
+        //  Read iterator from characters text file
+        InputStream resourceAsStream = getClass().getResourceAsStream(resource);
+        BufferedReader br = new BufferedReader(new InputStreamReader(resourceAsStream));
+
+        String line;
+        List<int[]> data = new ArrayList<>();
+
+        try {
+            while ((line = br.readLine()) != null) {
+                String[] split = line.split(",");
+                data.add(Arrays.stream(split).mapToInt(Integer::parseInt).toArray());
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Return characters
+        return data;
     }
 
     private void test() {
         new GA()
+                .setTrainTestData(trainData)
+                .setValidationData(validationData)
                 .evolve()
                 .earlyStop(false)
                 .predict();
@@ -27,7 +60,9 @@ public class Main {
                         System.out.println("-- Mutation Probability: " + prob);
                         for (double rate: new double[]{0.5, 1, 5, 10}){
                             System.out.println("--- Mutation Magnitude: " + rate);
-                            new GA()
+                            GA ga = new GA();
+                            ga.setTrainTestData(trainData)
+                                    .setValidationData(validationData)
                                     .evolve(model, popSize, xOver, prob, rate)
                                     .earlyStop(false)
                                     .predict();

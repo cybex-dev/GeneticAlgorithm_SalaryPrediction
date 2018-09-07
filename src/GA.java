@@ -6,34 +6,28 @@ import java.util.Random;
 
 class GA {
 
-    private final String carat = ",";
-
-    // Population solution size
-    private int populationSize = 1000;
-    // Number of genes in a chromosome
-    private final int numberOfAttributes = 7;
-    // Size of tournament, used in chromosome selection
-    private int tournamentPopSize = 10;
-
-    // crossover threshold favouring optimal parent
-    private double crossoverThreshold = 0.5;
-
-    // Probabilty of mutation
-    private double mutationProb = 0.5;
-
-    // Gene mutation rate, small mutation rate
-    private double mutationMagnitude = 10;
-
-    // Store current generation
-    private int generation = 0;
     // Max generations before stopping
     private static final int maxGeneration = 1000;
-
+    private final String carat = ",";
+    // Number of genes in a chromosome
+    private final int numberOfAttributes = 7;
+    // Population solution size
+    private int populationSize = 1000;
+    // Size of tournament, used in chromosome selection
+    private int tournamentPopSize = 10;
+    // crossover threshold favouring optimal parent
+    private double crossoverThreshold = 0.5;
+    // Probabilty of mutation
+    private double mutationProb = 0.5;
+    // Gene mutation rate, small mutation rate
+    private double mutationMagnitude = 10;
+    // Store current generation
+    private int generation = 0;
     // Store data for training, testing and validation sets
     // [row number] [# of attributes]
     private int[][] trainingData = null,
-                testData = null,
-                validationData = null;
+            testData = null,
+            validationData = null;
 
     // Container for holding actual salaries, row number corresponding to [x][] of the relevant data set
     private double[] trainingActualSalary = null,
@@ -47,19 +41,22 @@ class GA {
     private double previousTestSSE = Double.MAX_VALUE;
     private double[] previousTestSolution = new double[numberOfAttributes];
 
-    private File offspringFile, popSolutionsFile;
+    private File popSolutionsFile;
+
+    private String[] results = null;
+    int resultIndex = -1;
 
     /**
      * Model Index:
-     * 0. Simple Linear
-     * 1. Linear with constant
-     * 2. Exponential with constant
+     * 0. Simple Linear             - c1*v1 + c2*v2 + ... + cN * vN
+     * 1. Linear with constant      - c1*v1 + c2*v2 + ... + cN * vN + cN+1
+     * 2. Exponential with constant - (c1*v1)^c9 + (c2*v2)^c10 + ... + (cN * vN)^c2N+1
      */
     private int modelIndex = 2;
 
     // Container to store training and testing SSE
-    private double[] trainingSSE = new double[populationSize],
-            testSSE = new double[populationSize];
+    private double[] trainingSSE = null,
+            testSSE = null;
 
     // Solutions generated which are evolved. [number of solutions][c values for each solution]
     private double[][] population = null;
@@ -67,26 +64,28 @@ class GA {
     // Stops processing after fittest solution is found
     private boolean stopOnFittestFound;
 
+    GA() {}
 
-    GA(){
-        offspringFile = new File("output/offspring_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
-        popSolutionsFile = new File("output/pop_solutions_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
-        if (offspringFile.exists())
-            popSolutionsFile.delete();
-        if (offspringFile.exists())
-            popSolutionsFile.delete();
-    }
-
-    public GA evolve(){
+    public GA evolve() {
         tournamentPopSize = populationSize / 10;
 
         System.out.println("Starting: \tPopSize=" + populationSize + " \tTour=" + tournamentPopSize + " \tX=" + crossoverThreshold + " \tMProb=" + mutationProb + " \tMMag=" + mutationMagnitude);
+
+        popSolutionsFile = new File("output/pop_solutions_model" + (modelIndex + 1) + "_PopSize" + populationSize + "_Tour" + tournamentPopSize + "_X" + crossoverThreshold + "_MProb" + mutationProb + "_MMag" + mutationMagnitude + ".csv");
+        try {
+            if (popSolutionsFile.exists())
+                popSolutionsFile.delete();
+            popSolutionsFile.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
 
         run();
         return this;
     }
 
-    public GA evolve(int modelIndex, int populationSize, double crossoverThreshold, double mutationProb, double mutationMagnitude){
+    public GA evolve(int modelIndex, int populationSize, double crossoverThreshold, double mutationProb, double mutationMagnitude) {
         this.modelIndex = modelIndex;
         this.populationSize = populationSize;
         this.crossoverThreshold = crossoverThreshold;
@@ -95,36 +94,46 @@ class GA {
         return evolve();
     }
 
-    private void run(){
+    private void run() {
         // Generate initial population
         generatePopulation();
 
         // Determine training and testing MSE
         // Store determined salaries for each
-        //$system.out.print("E #" + generation + " : ");
-        evaluatePopulation(population, trainingData, trainingActualSalary, calcTrainSalary, trainingSSE);
-        evaluatePopulation(population, testData, testActualSalary, calcTestSalary, testSSE);
+        System.out.print("Progress: " + generation + "...");
+        evaluatePopulation(trainingData, trainingActualSalary, calcTrainSalary, trainingSSE);
+        evaluatePopulation(testData, testActualSalary, calcTestSalary, testSSE);
 
         // while terminating condition not reached
         while (!terminate()) {
             //Increment generation
             generation++;
-            System.out.println("#" + generation);
+            if (generation % 100 == 0) {
+                System.out.print(generation + "...");
+            }
 
             // Generate new population using tournament selection and use elitism and mutate based on performance
             double[][] newPop = createOffspring(population);
             System.arraycopy(newPop, 0, population, 0, population.length);
 
             // Evolve new generation and store solutions
-            evaluatePopulation(population, trainingData, trainingActualSalary, calcTrainSalary, trainingSSE);
-            evaluatePopulation(population, testData, testActualSalary, calcTestSalary, testSSE);
+            evaluatePopulation(trainingData, trainingActualSalary, calcTrainSalary, trainingSSE);
+            evaluatePopulation(testData, testActualSalary, calcTestSalary, testSSE);
         }
 
-        System.out.println("\tSSE:\t\t" + previousTestSSE);
+        writeResults(popSolutionsFile, results);
+
+        String[] solution = new String[population[0].length];
+        System.arraycopy(Arrays.stream(previousTestSolution).mapToObj(v -> String.valueOf(v) + carat).toArray(), 0, solution, 0, solution.length);
+        writeResults(popSolutionsFile, solution);
+
+        System.out.println("Done\n\tSSE:\t\t" + previousTestSSE);
+        System.out.println("Solution: \t" + Arrays.stream(solution).reduce((s, s2) -> s + "\t" + s2).orElse("Unknown Solution"));
     }
 
     private boolean terminate() {
-        writeOffspring();
+//        saveOffspring(population);
+
 
         if (generation >= maxGeneration) {
             //$system.out.println("NOTE: Generation timeout reached (" + generation + " iterations)");
@@ -133,17 +142,11 @@ class GA {
 
         // Fittest index based on solutions index
         int fittestIndex = getFittest(testSSE);
-        int numberOfMatches = salaryMatches(calcTestSalary[fittestIndex], testActualSalary);
 
-        writeToFile(generation + carat + testSSE[fittestIndex] + "\n");
-
-        if (numberOfMatches == testActualSalary.length) {
-            //$system.out.println("NOTE: Solution found at generation " + generation + "with solution: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
-            return true;
-        }
+        saveResult(testSSE[fittestIndex] + "\n");
 
         // Check if lowest SSE is reached
-        if (testSSE[fittestIndex] > previousTestSSE){
+        if (testSSE[fittestIndex] > previousTestSSE) {
             //$system.out.println("NOTE: Lowest Test SSE reached [" + fittestIndex + "]: " + Arrays.stream(population[fittestIndex]).mapToObj(Double::toString).reduce((s, s2) -> s + "\t\t" + s2).orElse("Unknown Solution"));
             if (stopOnFittestFound)
                 return true;
@@ -158,45 +161,39 @@ class GA {
         return false;
     }
 
+    private void saveResult(String s) {
+        resultIndex++;
+        results[resultIndex] = s;
+    }
+
+//    private void saveOffspring(double[] results){
+//        resultsOffspring[++resultOffspringIndex] = results;
+//    }
+
     /**
      * Calculate the fitness of a specific solution given the determined salaries and actual salaries
+     *
      * @param calculatedSalaries calculated salaries
-     * @param actualSalaries actual salaries from data
+     * @param actualSalaries     actual salaries from data
      * @return fitness value
      */
     private int salaryMatches(double[] calculatedSalaries, double[] actualSalaries) {
         int currentFittest = 0;
         for (int j = 0; j < calculatedSalaries.length; j++) {
-            if (calculatedSalaries[j] == actualSalaries[j]){
+            if (calculatedSalaries[j] == actualSalaries[j]) {
                 currentFittest++;
             }
         }
         return currentFittest;
     }
 
-    private void writeToFile(String s) {
+    private void writeResults(File file, String[] arr) {
         try {
-            FileWriter writer = new FileWriter(popSolutionsFile, true);
+            FileWriter writer = new FileWriter(file, true);
             PrintWriter printWriter = new PrintWriter(writer, true);
-            printWriter.write(s);
-            printWriter.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void writeOffspring() {
-        try {
-            FileWriter writer = new FileWriter(offspringFile, true);
-            PrintWriter printWriter = new PrintWriter(writer, true);
-
-            printWriter.write("#" + generation );
-            Arrays.stream(population).forEach(doubles -> {
-                printWriter.write(carat);
-                Arrays.stream(doubles).forEach(value -> printWriter.write(value + carat));
-            });
-            printWriter.write("\n");
-
+            for (int i = 0; i < arr.length; i++) {
+                printWriter.write(arr[i]);
+            }
             printWriter.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -204,11 +201,11 @@ class GA {
     }
 
     /**
-     *  Determines the salary of each data item for all solutions in the current population
-     *
-     *  Also, the MSE is calculates for each salary
+     * Determines the salary of each data item for all solutions in the current population
+     * <p>
+     * Also, the MSE is calculates for each salary
      */
-    private void evaluatePopulation(double[][] population, int[][] dataItems, double[] actualSalaryStore, double[][] calcSalaryStore, double[] sseStore) {
+    private void evaluatePopulation(int[][] dataItems, double[] actualSalaryStore, double[][] calcSalaryStore, double[] sseStore) {
 
         // for each solution in the population, determine the salary using model # and store this.
         for (int i = 0; i < population.length; i++) {
@@ -216,7 +213,7 @@ class GA {
             // current population solution
             double[] solution = population[i];
 
-            Double localSSE = 0.0;
+            double localSSE = 0.0;
 
             // Traverse of training data, determining the salary from the current solution
             for (int i1 = 0; i1 < dataItems.length; i1++) {
@@ -224,13 +221,11 @@ class GA {
                 double salary = determineSalary(dataItems[i1], solution);
 
                 // Add determined salary to the list of solutions
-                Double sal = salary;
-                calcSalaryStore[i][i1] = sal;
+                calcSalaryStore[i][i1] = salary;
 
                 // Add { (Tp - Op) ^ 2 } to MSE set for each iteration. At the end,  MSE[i] / populationSize to get the actual MSE for a solution
                 double v = actualSalaryStore[i1] - salary;
-                double pow = Math.pow(v, 2);
-                localSSE += pow;
+                localSSE += v * v;
             }
 
             sseStore[i] = localSSE;
@@ -263,16 +258,24 @@ class GA {
     }
 
     private void generatePopulation() {
-       trainingSSE = new double[populationSize];
-       testSSE = new double[populationSize];
+
 
         int numWeights = 0;
 
         switch (modelIndex) {
-            case 2: numWeights = numberOfAttributes;
-            case 1: numWeights += 1;
-            case 0: numWeights += numberOfAttributes; break;
+            case 2:
+                numWeights = numberOfAttributes;
+            case 1:
+                numWeights += 1;
+            case 0:
+                numWeights += numberOfAttributes;
+                break;
         }
+
+        trainingSSE = new double[populationSize];
+        testSSE = new double[populationSize];
+
+        results = new String[maxGeneration];
 
         // Initialize first generation solutions
         population = new double[populationSize][numWeights];
@@ -286,10 +289,10 @@ class GA {
         }
 
         // Read Training and Testing data
-        readTrainAndValidationData();
+        //readTrainAndValidationData();
 
         // read Validation Data
-        readEvaluationData();
+        //readEvaluationData();
 
         calcTrainSalary = new double[population.length][trainingData.length];
         calcTestSalary = new double[population.length][testData.length];
@@ -299,12 +302,15 @@ class GA {
         return new Random().nextDouble();
     }
 
-    private double nextGaussian(){
+    private double nextGaussian() {
         return new Random().nextGaussian();
     }
 
-    private void readTrainAndValidationData() {
-        List<int[]> ints = readCharactersFromFile("/SalData.csv");
+    public GA setTrainTestData(List<int[]> ints){
+        return readTrainAndValidationData(ints);
+    }
+
+    private GA readTrainAndValidationData(List<int[]> ints) {
 
         int ninetyPercentStart = ints.size() - (ints.size() / 5);
 
@@ -325,38 +331,25 @@ class GA {
             System.arraycopy(ints1, 1, testData[i], 0, ints1.length - 1);
             testActualSalary[i] = ints1[0];
         }
+
+        return this;
+    }
+
+    public GA setValidationData(List<int[]> ints){
+        return readEvaluationData(ints);
     }
 
     //TODO seperate actual salary from data
-    private void readEvaluationData() {
-        List<int[]> ints = readCharactersFromFile("/Evaluation.csv");
+    private GA readEvaluationData(List<int[]> ints) {
+
         validationData = new int[ints.size()][numberOfAttributes];
 
         for (int i = 0; i < ints.size(); i++) {
             int[] ints1 = ints.get(i);
-            System.arraycopy(ints1, 0, validationData[i], 0, ints1.length-1);
-        }
-    }
-
-    private List<int[]> readCharactersFromFile(String resource) {
-        //  Read iterator from characters text file
-        InputStream resourceAsStream = getClass().getResourceAsStream(resource);
-        BufferedReader br = new BufferedReader(new InputStreamReader(resourceAsStream));
-
-        String line;
-        List<int[]> data = new ArrayList<>();
-
-        try {
-            while ((line = br.readLine()) != null) {
-                String[] split = line.split(",");
-                data.add(Arrays.stream(split).mapToInt(Integer::parseInt).toArray());
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+            System.arraycopy(ints1, 0, validationData[i], 0, ints1.length - 1);
         }
 
-        // Return characters
-        return data;
+        return this;
     }
 
     private double[][] createOffspring(double[][] population) {
@@ -374,14 +367,14 @@ class GA {
         int worstPerformers = population.length / 10;
 
         // Crossovers with mutation
-        while (offspringCount < ((population.length-1) - worstPerformers)) {
+        while (offspringCount < ((population.length - 1) - worstPerformers)) {
             int p1Index = tournamentSelect(population);
             int p2Index = tournamentSelect(population);
 
 //            //$system.out.println("Selecting parents: " + p1Index + " & " + p2Index);
 
             // Favour most fit parent
-            if (trainingSSE[p1Index] > trainingSSE[p2Index]){
+            if (trainingSSE[p1Index] > trainingSSE[p2Index]) {
                 int temp = p1Index;
                 p2Index = p1Index;
                 p1Index = temp;
@@ -419,6 +412,7 @@ class GA {
 
     /**
      * Gets the index of the fittest solution in a given population
+     *
      * @param population a population
      * @return fittest index
      */
@@ -441,6 +435,7 @@ class GA {
 
     /**
      * Select ${tournamentPopSize} number of random individuals from current population
+     *
      * @param population
      * @return
      */
@@ -472,12 +467,16 @@ class GA {
     }
 
     public void predict() {
+        double[] predictions = new double[validationData.length];
         //$system.out.println("Using solution: " + Arrays.stream(previousTestSolution).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
         for (int i = 0; i < validationData.length; i++) {
-            double salary = determineSalary(validationData[i], previousTestSolution);
+            predictions[i] = determineSalary(validationData[i], previousTestSolution);
             //$system.out.println("Using DataItem: " + Arrays.stream(validationData[i]).mapToObj(Double::toString).reduce((s, s2) -> s + "," + s2).orElse("Unknown Solution"));
             //$system.out.println("#" + i + " Salary = " + salary);
         }
+        String[] results = new String[predictions.length];
+        System.arraycopy(Arrays.stream(predictions).mapToObj(v -> String.valueOf(v) + carat).toArray(),0, results, 0, predictions.length);
+        writeResults(popSolutionsFile, results);
     }
 
     public GA earlyStop(boolean b) {
